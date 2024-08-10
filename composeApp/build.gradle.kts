@@ -1,85 +1,120 @@
+import com.android.build.api.variant.ResValue
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.util.*
 
 plugins {
-    alias(libs.plugins.kotlinMultiplatform)
-    alias(libs.plugins.androidApplication)
-    alias(libs.plugins.jetbrainsCompose)
-    alias(libs.plugins.compose.compiler)
-}
-
-kotlin {
-    androidTarget {
-        @OptIn(ExperimentalKotlinGradlePluginApi::class)
-        compilerOptions {
-            jvmTarget.set(JvmTarget.JVM_11)
-        }
-    }
-    
-    listOf(
-        iosX64(),
-        iosArm64(),
-        iosSimulatorArm64()
-    ).forEach { iosTarget ->
-        iosTarget.binaries.framework {
-            baseName = "ComposeApp"
-            isStatic = true
-        }
-    }
-    
-    sourceSets {
-        
-        androidMain.dependencies {
-            implementation(compose.preview)
-            implementation(libs.androidx.activity.compose)
-        }
-        commonMain.dependencies {
-            implementation(compose.runtime)
-            implementation(compose.foundation)
-            implementation(compose.material)
-            implementation(compose.ui)
-            implementation(compose.components.resources)
-            implementation(compose.components.uiToolingPreview)
-            implementation(projects.shared)
-        }
-    }
+    id("caloriture.primitive.kmp.common")
+    id("caloriture.primitive.kmp.android.application")
+    id("caloriture.primitive.kmp.android.compose")
+    id("caloriture.primitive.kmp.android")
+    id("caloriture.primitive.kmp.ios")
 }
 
 android {
     namespace = "me.matsumo.caloriture"
-    compileSdk = libs.versions.android.compileSdk.get().toInt()
 
-    sourceSets["main"].manifest.srcFile("src/androidMain/AndroidManifest.xml")
-    sourceSets["main"].res.srcDirs("src/androidMain/res")
-    sourceSets["main"].resources.srcDirs("src/commonMain/resources")
-
-    defaultConfig {
-        applicationId = "me.matsumo.caloriture"
-        minSdk = libs.versions.android.minSdk.get().toInt()
-        targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = 1
-        versionName = "1.0"
+    val localProperties = Properties().apply {
+        load(project.rootDir.resolve("local.properties").inputStream())
     }
-    packaging {
-        resources {
-            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+
+    signingConfigs {
+        getByName("debug") {
+            storeFile = file("${project.rootDir}/gradle/keystore/debug.keystore")
+        }
+        create("release") {
+            storeFile = file("${project.rootDir}/gradle/keystore/release.keystore")
+            storePassword = localProperties.getProperty("storePassword") ?: System.getenv("RELEASE_STORE_PASSWORD")
+            keyPassword = localProperties.getProperty("keyPassword") ?: System.getenv("RELEASE_KEY_PASSWORD")
+            keyAlias = localProperties.getProperty("keyAlias") ?: System.getenv("RELEASE_KEY_ALIAS")
+        }
+        create("billing") {
+            storeFile = file("${project.rootDir}/gradle/keystore/release.keystore")
+            storePassword = localProperties.getProperty("storePassword") ?: System.getenv("RELEASE_STORE_PASSWORD")
+            keyPassword = localProperties.getProperty("keyPassword") ?: System.getenv("RELEASE_KEY_PASSWORD")
+            keyAlias = localProperties.getProperty("keyAlias") ?: System.getenv("RELEASE_KEY_ALIAS")
         }
     }
+
     buildTypes {
-        getByName("release") {
-            isMinifyEnabled = false
+        release {
+            signingConfig = signingConfigs.getByName("release")
+            isMinifyEnabled = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }
+        debug {
+            signingConfig = signingConfigs.getByName("debug")
+            isDebuggable = true
+            versionNameSuffix = ".D"
+            applicationIdSuffix = ".debug"
+        }
+        create("billing") {
+            signingConfig = signingConfigs.getByName("billing")
+            isDebuggable = true
+            matchingFallbacks.add("debug")
         }
     }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
-    }
-    buildFeatures {
-        compose = true
-    }
-    dependencies {
-        debugImplementation(compose.uiTooling)
+
+    androidComponents {
+        onVariants {
+            val appName = when (it.buildType) {
+                "debug" -> "CaloriTure Debug"
+                "billing" -> "CaloriTure Billing"
+                else -> "CaloriTure"
+            }
+
+            it.resValues.apply {
+                put(it.makeResValueKey("string", "app_name"), ResValue(appName, null))
+            }
+
+            if (it.buildType == "release") {
+                it.packaging.resources.excludes.add("META-INF/**")
+            }
+        }
     }
 }
 
+composeCompiler {
+    enableStrongSkippingMode = true
+}
+
+kotlin {
+    sourceSets {
+        val commonMain by getting {
+            dependencies {
+                implementation(libs.moko.permissions)
+                implementation(libs.moko.permissions.compose)
+                implementation(libs.moko.biometry)
+                implementation(libs.moko.biometry.compose)
+            }
+        }
+
+        val androidMain by getting {
+            dependsOn(commonMain)
+            dependencies {
+                implementation(libs.androidx.core.splashscreen)
+                implementation(libs.play.review)
+                implementation(libs.play.update)
+                implementation(libs.google.material)
+            }
+        }
+
+        val iosX64Main by getting
+        val iosArm64Main by getting
+        val iosSimulatorArm64Main by getting
+        val iosMain by getting {
+            dependsOn(commonMain)
+            iosX64Main.dependsOn(this)
+            iosArm64Main.dependsOn(this)
+            iosSimulatorArm64Main.dependsOn(this)
+        }
+    }
+}
+
+buildkonfig {
+    packageName = "me.matsumo.caloriture"
+    defaultConfigs {
+
+    }
+}
