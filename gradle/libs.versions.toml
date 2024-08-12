@@ -192,6 +192,8 @@ ktor-serialization-json = { module = "io.ktor:ktor-serialization-kotlinx-json", 
 ktot-logging = { module = "io.ktor:ktor-client-logging", version.ref = "ktor" }
 ktor-server-core = { module = "io.ktor:ktor-server-core-jvm", version.ref = "ktor" }
 ktor-server-netty = { module = "io.ktor:ktor-server-netty-jvm", version.ref = "ktor" }
+ktor-server-locations = { module = "io.ktor:ktor-locations", version.ref = "ktor" }
+ktor-server-jackson = { module = "io.ktor:ktor-jackson", version.ref = "ktor" }
 ktor-server-tests = { module = "io.ktor:ktor-server-tests-jvm", version.ref = "ktor" }
 
 # Others
@@ -266,6 +268,15 @@ ktor-client = [
     "ktor-content-negotiation",
     "ktor-serialization-json",
     "ktot-logging",
+]
+
+ktor-server = [
+    "ktor-server-core",
+    "ktor-server-netty",
+    "ktor-server-locations",
+    "ktor-server-jackson",
+    "ktor-server-tests",
+    "logback",
 ]
 
 koin = [
